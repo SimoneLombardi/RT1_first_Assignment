@@ -7,6 +7,7 @@ from sr.robot import *
 
 import numpy
 import array
+import random
 
 R = Robot()
 
@@ -59,138 +60,213 @@ def find_token():
         return dist, rot_y
     
 #-----------------------------------------variabili globali mie------------------------------------------#
-
+SPEED = 80
+TIME = 0.25
 #-----------------------------------------funzioni mie---------------------------------------------------#
-def create_token_list(token_list):
+def create_token_list():
+    temp_list = list(()) # inizializzo la lista con il costruttore
 
     for i in range(7):
-        what_i_see = R.see() 
+        what_i_see = R.see() # scannerizzo il campo per vedere i token
 
         for j in what_i_see:
-            token_list.append(j.info.code)
-
-        turn(80, 0.213)    
-
-    print("not unique", token_list)  
-    token_list.append(38)
-    temp_array = numpy.unique(token_list)
-
-    token_list = temp_array.tolist()
-    print("unique ", token_list)
+            print("elemento visto, codice, sezione", j.info.code, i)
+            if j.info.code in temp_list:
+                print("already added...") # se il codice è già stato trovato non lo aggiungo
+            else:
+                temp_list.append(j.info.code) # se trovo codice nuovo allora aggiungo in fondo
+ 
+        print("turning...\n")
+        if i != 6: # non faccio l'ultima rotazione per arrivare nella pos di partenza
+            turn(SPEED, TIME)
     
-    return token_list
-            
-def set_ancor_token(): # -------------------------------------------
+    return temp_list
 
-    choosen_ancor = -1
+    
+def set_ancor_token():
+    token_list = create_token_list()
 
-    while choosen_ancor == -1:
+    # prendo come ancora un token qualsiasi all'interno della lista token
+    temp_index = random.randint(0, len(token_list)-1)
+    ancor_token = token_list[temp_index] 
+
+    return token_list, ancor_token
+    
+
+def create_grabbed_token_list(token, grabbed_token_list, token_list): # questa funzione crea e restituisce una lista dei token che non vanno più toccati
+    if len(grabbed_token_list) == 0:
+        grabbed_token_list = list(()) # se la lista è vuota la inizializzo come lista
+        for i in token_list:
+            grabbed_token_list.append(-1)
+    
+    index = token_list.index(token)
+
+    grabbed_token_list.pop(index) # elimino l'elemento temporaneo all'indice x
+    grabbed_token_list.insert(index, token) # aggiungo il token che è stato mosso all'indice pari a quello di token_list
+
+    return grabbed_token_list # ritorno la lista modificata
+# crea e aggiorna la lista dei token che sono stati mossi 
+
+def find_movable_token(grabbed_token_list):
+    avail_token = -1 # inizializzo il codice del token a -1 per un ciclo while
+
+    while avail_token == -1:
         what_i_see = R.see()
         if len(what_i_see) == 0:
-            choosen_ancor = -1
-            turn(80, 0.213)
+            turn(SPEED, TIME)
         else:
-            choosen_ancor = what_i_see[0].info.code
+            for i in what_i_see:
+                if i.info.code not in grabbed_token_list:
+                    avail_token = i.info.code
+                    print("found available token...\n")
+                    return avail_token
+                else:
+                    continue
+            
+            ("searching for available token...\n")
+            turn(SPEED, TIME)
+# scannerizza l'arena per un token che non sia presente dentro la lista dei token che 
+# sono già stati mossi e lo restituisce alla chiamante
+
+def go_to_token(token_code, ancorDistTol):
+    print("INSIDE GO TO TOKEN...\n")
+    (dist, ang) = get_token_info(token_code) # prendo le varibili del token per la prima votla
+    while dist == -1 and ang == -1:
+        turn(SPEED, TIME)
+        (dist, ang) = get_token_info(token_code)
+
+    # definisco delle tolleranze per i cicli della rotazione e distanza
+    ang_tol = 1
+    if ancorDistTol == 0:       
+        dist_tol = 0.5
+    else:
+        dist_tol = ancorDistTol
+
+    while(abs(ang) > ang_tol): # ----------------------------------------------------------------
+        TSPEED, TTIME = turn_parameters(ang)
+        turn(TSPEED, TTIME)
+        (dist, ang) = get_token_info(token_code)
+        print("ang: ", ang, token_code)
+
         
+    while(dist > dist_tol): # --------------------------------------------------------------------
+        DSPEED, DTIME = drive_parameters(dist)
+        drive(DSPEED, DTIME)
+        (dist, ang) = get_token_info(token_code)
+        print("dist: ", dist, token_code)    
 
-    return choosen_ancor
+    try:
+        print("inside try exe")  
+        grab_status = R.grab()
+        print(grab_status)
+        while grab_status == False:
+            drive(5, 1)
+            grab_status = R.grab()
+    except:
+        R.release()
 
-def go_to_token(token_to_grab): # -------------------------------------------
-    dist = 0
-    ang = 0
+# questa funzione mi permette di arrivare a qualsiasi token entro una tolleranza, se devo raggiungere 
+# l'ancora la tolleranza della distanza devo passarla come parametro ed è maggiore  
+
+def list_comparison(token_list, grabbed_token_list):
+    if len(token_list) != len(grabbed_token_list):
+        print("errore liste lunghezza diversa")
+        exit()
+    
+    controllo = 1
+    for i in range(len(token_list)):
+        if token_list[i] != grabbed_token_list[i]:
+            controllo = 0
+
+    return controllo
+
+
+def get_token_info(token_code):
+    dist = ang = -1
+    what_i_see = R.see()
 
     for i in what_i_see:
-        what_i_see = R.see()
-        print("cosa vedo: ", i.info.code)
-        if i.info.code == token_to_grab:
+        if i.info.code == token_code:
+            print("token code trovato...", i.info.code)
             dist = i.dist
             ang = i.rot_y
-
-        turn(80, 0.213)
-
-    print("start dist: ", dist)
-    print("start ang", ang)
-
-    ang_tol = 1
-    dist_tol = 0.5
-
-    tspeed = 1
-    speed = 100
-
-    time = 0.5
-    ttime = 1
-
-    while(abs(ang) > ang_tol):
-        what_i_see = R.see()
-        for i in what_i_see:
-            if i.info.code == token_to_grab:
-                ang = i.rot_y
-        
-
-        turn(numpy.sign(ang)*tspeed, ttime)
-        print("angolo: ", ang)
-        
-    while(dist > dist_tol):
-        what_i_see = R.see()
-        for i in what_i_see:
-            if i.info.code == token_to_grab:
-                dist = i.dist
-        
-        drive(dist*speed, time)
-        print("distanza: ", dist)
+            break
     
-    R.grab()
+    return dist, ang
+# passa le info posizione del token con codice token_code alla funzione chiamanta
 
+def turn_parameters(ang):
+    sign_moltip = -1
+    TSPEED = TTIME = 1
 
-def grab_token_and_back(ancor_token, token_list): # -------------------------------------------
-    token_to_grab = token_list[0]
-    print("token to grab: ", token_to_grab)
-
-    found_token = -1
-
-    while found_token != 1:
-        print("start search for: ", token_to_grab)
-        what_i_see = R.see()
-        if len(what_i_see) == 0:
-            found_token = -1
-            turn(80, 0.213)
+    if ang > 0 :
+        if ang < 2:
+            TSPEED = 1
+            print("velocità trovata", TSPEED)
         else:
-            print("lista non vuota...\n")
-            for i in what_i_see:
-                if i.info.code == token_to_grab:
-                    found_token = 1
-                    print("token trovato\n")
-                    break
-                else:
-                    found_token = -1
+            TSPEED = round(abs((abs(ang)/3)-0.5))
+            print("velocità trovata", TSPEED)
+    else :
+        if ang > -2:
+            TSPEED = 1 * sign_moltip
+            print("velocità trovata", TSPEED)
+        else:
+            TSPEED = round(abs((abs(ang)/3)-0.5)) * sign_moltip
+            print("velocità trovata", TSPEED)
+
+
         
 
-    go_to_token(token_to_grab)
-    go_to_token(ancor_token)
-    R.release()
+    return TSPEED, TTIME
 
-    
-def update_token_list(token, token_list):
-    token_list.remove(token)
+def drive_parameters(dist):
+    DSPEED = 1
+    DTIME = 0.7558
 
-    return token_list
+    DSPEED = dist / 0.01
+    print("dspeed: ", DSPEED)
+    if dist < 1:
+        DTIME = DTIME / 2
+
+    return DSPEED, DTIME
+# passa i parametri per la velocità e tempo per i cicli di correzione per arrivare ai token
 
 #-----------------------------------------definizione main-----------------------------------------------#
 
 def main():
-    token_list = []
+    (token_list, ancor) = set_ancor_token() # creo la lista token e il token ancora
+    grabbed_token_list = []
 
-    token_list = create_token_list(token_list)
     print(token_list)
-
-    ancor = set_ancor_token()
     print(ancor)
 
-    update_token_list(ancor, token_list)
+    # aggiungo il token ancora alla lista dei token da non muovere e modifico la lista 
+    grabbed_token_list = create_grabbed_token_list(ancor, grabbed_token_list, token_list) 
+    print(grabbed_token_list)
 
-    grab_token_and_back(ancor, token_list)
+    ancorTol = 0.85
 
-    
+    #---------------------------------------------------------------------------------------------#
+    # inizializzazione del problema terminata, da adesso finchè token_list != grabbed_token_list continuo a:
+    # 1) cerca token, 2) controlla se devi spostarlo, 3) se si spostalo 3.1) aggiorna lista grabbed 4) ripeti 
+    #                                                  3) se no vai al (4)
+    CONTROL = 0
+
+    token = find_movable_token(grabbed_token_list)
+    print("available token: ", token)
+
+    go_to_token(token, 0)
+    go_to_token(ancor, ancorTol)
+    R.release()
+
+    grabbed_token_list = create_grabbed_token_list(token, grabbed_token_list, token_list)
+    print(grabbed_token_list)
+
+    CONTROL = list_comparison(token_list, grabbed_token_list)
+    print(CONTROL)
+
+
+
 
 
 #-----------------------------------------running--------------------------------------------------------#
