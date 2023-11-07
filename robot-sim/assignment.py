@@ -1,4 +1,5 @@
 from __future__ import print_function
+from math import ceil
 from readline import insert_text
 
 import time
@@ -112,24 +113,30 @@ def find_movable_token(grabbed_token_list):
     print("finding movable token...\n")
     avail_token = -1 # inizializzo il codice del token a -1 per un ciclo while
 
+    cycle_count = 0 # conto quanti giri faccio prima di trovare un token che vada bene
+
     while avail_token == -1:
         what_i_see = R.see()
         if len(what_i_see) == 0:
             turn(SPEED, TIME)
+            cycle_count = cycle_count + 1 # incremento cicli
         else:
             for i in what_i_see:
                 if i.info.code not in grabbed_token_list:
                     avail_token = i.info.code
                     print("token found: ", avail_token)
-                    return avail_token
+                    return avail_token, cycle_count
                 else:
                     continue
             
             turn(SPEED, TIME)
+            cycle_count = cycle_count + 1 # incremento cicli
+    # incremento cicli dopo ogni rotazione, vengono eseguite solo 1 volta per ciclo
+
 # scannerizza l'arena per un token che non sia presente dentro la lista dei token che 
 # sono già stati mossi e lo restituisce alla chiamante
 
-def go_to_token(token_code, ancorDistTol):
+def go_to_token(token_code, ancorDistTol, cycle_count):
     print("getting to token: ", token_code)
     (dist, ang) = get_token_info(token_code) # prendo le varibili del token per la prima votla
     while dist == -1 and ang == -1:
@@ -143,11 +150,14 @@ def go_to_token(token_code, ancorDistTol):
     else:
         dist_tol = ancorDistTol
 
-    while(abs(ang) > ang_tol): # ----------------------------------------------------------------
+    angle_correction = -0.3 # per i primi 3 cicli non voglio aumentare la tolleranza
+
+    while(abs(ang) > ang_tol+angle_correction): # ----------------------------------------------------------------
         print("ang correction: ", ang)
         TSPEED, TTIME = turn_parameters(ang)
         turn(TSPEED, TTIME)
         (dist, ang) = get_token_info(token_code)
+        angle_correction = angle_correction + 0.1
 
         
     while(dist > dist_tol): # --------------------------------------------------------------------
@@ -166,7 +176,7 @@ def go_to_token(token_code, ancorDistTol):
         R.release()
 
 # questa funzione mi permette di arrivare a qualsiasi token entro una tolleranza, se devo raggiungere 
-# l'ancora la tolleranza della distanza devo passarla come parametro ed è maggiore  
+# l'ancora la tolleranza della distanza devo passarla come parametro ed è maggiore 
 
 def list_comparison(token_list, grabbed_token_list):
     if len(token_list) != len(grabbed_token_list):
@@ -203,14 +213,14 @@ def turn_parameters(ang):
             TSPEED = 1
             print("velocità trovata", TSPEED)
         else:
-            TSPEED = round(abs((abs(ang)/3)-0.5))
+            TSPEED = ceil(abs((abs(ang)/3)-0.5))
             print("velocità trovata", TSPEED)
     else :
         if ang > -2:
             TSPEED = 1 * sign_moltip
             print("velocità trovata", TSPEED)
         else:
-            TSPEED = round(abs((abs(ang)/3)-0.5)) * sign_moltip
+            TSPEED = ceil(abs((abs(ang)/3)-0.5)) * sign_moltip
             print("velocità trovata", TSPEED)
 
 
@@ -254,11 +264,11 @@ def main():
     CONTROL = 0
     while CONTROL == 0:
         # trovo un codice di token che posso spostare
-        token_code = find_movable_token(grabbed_token_list) 
+        token_code, cycle_count = find_movable_token(grabbed_token_list) 
         
         # vado a prendere il token con codice token_code
-        go_to_token(token_code, 0) # tolleranza a zero --> seguo token non ancor
-        go_to_token(ancor, ancorTol) # tolleranza a ancorTol --> seguo ancor
+        go_to_token(token_code, 0, cycle_count) # tolleranza a zero --> seguo token non ancor
+        go_to_token(ancor, ancorTol, cycle_count) # tolleranza a ancorTol --> seguo ancor
         R.release()
 
         # aggiorno la lista dei token grabbati
@@ -270,7 +280,47 @@ def main():
             print("continue putting token away...CONTROL = ", CONTROL)
         else:
             print("no more token...CONTROL = ", CONTROL)
+'''
+problematiche trovate nell'esecuzione :
+    0) modificare arrotondamento velocità superiore --> evitare problema blocco a speed 0
+    1) sensibilità dell'angolo soluzioni possibili
+        1.1) aumentare tolleranza con aumentare dei cicli
+        1.2) modificare tempo e velocità secondo una legge
+        1.3) modificare la tolleranza con informazioni sulla distanza -> variazione troppo sensibile a dist grandi
 
+    2) avvicinamento al token
+
+    3) ricerca del token ancora 
+        3.1) fare trace back delle rotazioni
+
+def create_token_list():
+    non serve modificarla
+    
+def set_ancor_token():
+    non serve modificarla
+
+def create_grabbed_token_list(token, grabbed_token_list, token_list): 
+    non serve modificarla
+
+def find_movable_token(grabbed_token_list):
+    deve poter ritornare il numero di rotazioni fatte per trovare il token successivo
+
+def go_to_token(token_code, ancorDistTol):
+    da modifcare con aggiunta go_to_ancor(ancor_code, rot_number) e togliere differenza su tolleranza
+
+def list_comparison(token_list, grabbed_token_list):
+    non serve modificare
+
+def get_token_info(token_code):
+    non serve modificare
+
+def turn_parameters(ang):
+    da modificare e vedere come
+
+def drive_parameters(dist):    
+
+
+'''
 
 #-----------------------------------------running--------------------------------------------------------#
 main()
