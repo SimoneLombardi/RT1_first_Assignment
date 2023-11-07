@@ -64,22 +64,23 @@ SPEED = 80
 TIME = 0.25
 #-----------------------------------------funzioni mie---------------------------------------------------#
 def create_token_list():
+    print("inizio generazione lista token...\n")
     temp_list = list(()) # inizializzo la lista con il costruttore
 
     for i in range(7):
         what_i_see = R.see() # scannerizzo il campo per vedere i token
 
         for j in what_i_see:
-            print("elemento visto, codice, sezione", j.info.code, i)
+            
             if j.info.code in temp_list:
-                print("already added...") # se il codice è già stato trovato non lo aggiungo
+                print("") # se il codice è già stato trovato non lo aggiungo
             else:
                 temp_list.append(j.info.code) # se trovo codice nuovo allora aggiungo in fondo
  
-        print("turning...\n")
         if i != 6: # non faccio l'ultima rotazione per arrivare nella pos di partenza
             turn(SPEED, TIME)
     
+    print("lista token generata...\n")
     return temp_list
 
     
@@ -108,6 +109,7 @@ def create_grabbed_token_list(token, grabbed_token_list, token_list): # questa f
 # crea e aggiorna la lista dei token che sono stati mossi 
 
 def find_movable_token(grabbed_token_list):
+    print("finding movable token...\n")
     avail_token = -1 # inizializzo il codice del token a -1 per un ciclo while
 
     while avail_token == -1:
@@ -118,18 +120,17 @@ def find_movable_token(grabbed_token_list):
             for i in what_i_see:
                 if i.info.code not in grabbed_token_list:
                     avail_token = i.info.code
-                    print("found available token...\n")
+                    print("token found: ", avail_token)
                     return avail_token
                 else:
                     continue
             
-            ("searching for available token...\n")
             turn(SPEED, TIME)
 # scannerizza l'arena per un token che non sia presente dentro la lista dei token che 
 # sono già stati mossi e lo restituisce alla chiamante
 
 def go_to_token(token_code, ancorDistTol):
-    print("INSIDE GO TO TOKEN...\n")
+    print("getting to token: ", token_code)
     (dist, ang) = get_token_info(token_code) # prendo le varibili del token per la prima votla
     while dist == -1 and ang == -1:
         turn(SPEED, TIME)
@@ -143,22 +144,21 @@ def go_to_token(token_code, ancorDistTol):
         dist_tol = ancorDistTol
 
     while(abs(ang) > ang_tol): # ----------------------------------------------------------------
+        print("ang correction: ", ang)
         TSPEED, TTIME = turn_parameters(ang)
         turn(TSPEED, TTIME)
         (dist, ang) = get_token_info(token_code)
-        print("ang: ", ang, token_code)
 
         
     while(dist > dist_tol): # --------------------------------------------------------------------
+        print("dist correction: ", dist)
         DSPEED, DTIME = drive_parameters(dist)
         drive(DSPEED, DTIME)
         (dist, ang) = get_token_info(token_code)
-        print("dist: ", dist, token_code)    
+         
 
     try:
-        print("inside try exe")  
         grab_status = R.grab()
-        print(grab_status)
         while grab_status == False:
             drive(5, 1)
             grab_status = R.grab()
@@ -187,7 +187,6 @@ def get_token_info(token_code):
 
     for i in what_i_see:
         if i.info.code == token_code:
-            print("token code trovato...", i.info.code)
             dist = i.dist
             ang = i.rot_y
             break
@@ -237,8 +236,8 @@ def main():
     (token_list, ancor) = set_ancor_token() # creo la lista token e il token ancora
     grabbed_token_list = []
 
-    print(token_list)
-    print(ancor)
+    print("generated token list: ", token_list)
+    print("choosen ancor: ", ancor)
 
     # aggiungo il token ancora alla lista dei token da non muovere e modifico la lista 
     grabbed_token_list = create_grabbed_token_list(ancor, grabbed_token_list, token_list) 
@@ -250,23 +249,27 @@ def main():
     # inizializzazione del problema terminata, da adesso finchè token_list != grabbed_token_list continuo a:
     # 1) cerca token, 2) controlla se devi spostarlo, 3) se si spostalo 3.1) aggiorna lista grabbed 4) ripeti 
     #                                                  3) se no vai al (4)
+
+
     CONTROL = 0
+    while CONTROL == 0:
+        # trovo un codice di token che posso spostare
+        token_code = find_movable_token(grabbed_token_list) 
+        
+        # vado a prendere il token con codice token_code
+        go_to_token(token_code, 0) # tolleranza a zero --> seguo token non ancor
+        go_to_token(ancor, ancorTol) # tolleranza a ancorTol --> seguo ancor
+        R.release()
 
-    token = find_movable_token(grabbed_token_list)
-    print("available token: ", token)
+        # aggiorno la lista dei token grabbati
+        grabbed_token_list = create_grabbed_token_list(token_code, grabbed_token_list, token_list)
 
-    go_to_token(token, 0)
-    go_to_token(ancor, ancorTol)
-    R.release()
-
-    grabbed_token_list = create_grabbed_token_list(token, grabbed_token_list, token_list)
-    print(grabbed_token_list)
-
-    CONTROL = list_comparison(token_list, grabbed_token_list)
-    print(CONTROL)
-
-
-
+        # aggiorno la variabile control 
+        CONTROL = list_comparison(token_list, grabbed_token_list)
+        if CONTROL == 0:
+            print("continue putting token away...CONTROL = ", CONTROL)
+        else:
+            print("no more token...CONTROL = ", CONTROL)
 
 
 #-----------------------------------------running--------------------------------------------------------#
