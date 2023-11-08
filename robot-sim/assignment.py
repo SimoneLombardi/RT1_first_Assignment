@@ -1,6 +1,6 @@
 from __future__ import print_function
-from math import ceil
 from readline import insert_text
+from math import ceil
 
 import time
 import token
@@ -9,6 +9,7 @@ from sr.robot import *
 import numpy
 import array
 import random
+import math
 
 R = Robot()
 
@@ -64,6 +65,85 @@ def find_token():
 SPEED = 80
 TIME = 0.25
 #-----------------------------------------funzioni mie---------------------------------------------------#
+def list_comparison(token_list, grabbed_token_list):
+    if len(token_list) != len(grabbed_token_list):
+        print("errore liste lunghezza diversa")
+        exit()
+    
+    controllo = 1
+    for i in range(len(token_list)):
+        if token_list[i] != grabbed_token_list[i]:
+            controllo = 0
+
+    return controllo
+
+
+def get_token_info(token_code):
+    dist = ang = -100
+    what_i_see = R.see()
+
+    for i in what_i_see:
+        if i.info.code == token_code:
+            dist = i.dist
+            ang = i.rot_y
+            break
+    
+    return dist, ang
+# passa le info posizione del token con codice token_code alla funzione chiamanta
+
+def get_ancor_tol(token_code):
+    what_i_see = R.see()
+
+    in_between_token = 0
+
+    ang_tol = 0.3
+    dist_tol = 1
+
+    (dist, ang) = get_token_info(token_code)
+
+    for i in what_i_see:
+        if  abs(i.rot_y - ang)<ang_tol and abs(i.dist - dist) < dist_tol:
+            in_between_token = in_between_token + 1
+    
+    if in_between_token == 0:
+        in_between_token = 1
+
+    return in_between_token
+
+
+def turn_parameters(ang):
+    sign_moltip = -1
+    TSPEED = TTIME = 1
+
+    if ang > 0 :
+        if ang < 2:
+            TSPEED = 1
+            print("velocità trovata", TSPEED)
+        else:
+            TSPEED = ceil(abs((abs(ang)/3)-0.5))
+            print("velocità trovata", TSPEED)
+    else :
+        if ang > -2:
+            TSPEED = 1 * sign_moltip
+            print("velocità trovata", TSPEED)
+        else:
+            TSPEED = ceil(abs((abs(ang)/3)-0.5)) * sign_moltip
+            print("velocità trovata", TSPEED)
+
+    return TSPEED, TTIME
+
+def drive_parameters(dist):
+    DSPEED = 1
+    DTIME = 0.7558
+
+    DSPEED = dist / 0.01
+    print("dspeed: ", DSPEED)
+    if dist < 1:
+        DTIME = DTIME / 2
+
+    return DSPEED, DTIME
+# passa i parametri per la velocità e tempo per i cicli di correzione per arrivare ai token
+
 def create_token_list():
     print("inizio generazione lista token...\n")
     temp_list = list(()) # inizializzo la lista con il costruttore
@@ -113,30 +193,28 @@ def find_movable_token(grabbed_token_list):
     print("finding movable token...\n")
     avail_token = -1 # inizializzo il codice del token a -1 per un ciclo while
 
-    cycle_count = 0 # conto quanti giri faccio prima di trovare un token che vada bene
 
     while avail_token == -1:
         what_i_see = R.see()
         if len(what_i_see) == 0:
             turn(SPEED, TIME)
-            cycle_count = cycle_count + 1 # incremento cicli
+            
         else:
             for i in what_i_see:
                 if i.info.code not in grabbed_token_list:
                     avail_token = i.info.code
                     print("token found: ", avail_token)
-                    return avail_token, cycle_count
+                    return avail_token
                 else:
                     continue
             
             turn(SPEED, TIME)
-            cycle_count = cycle_count + 1 # incremento cicli
     # incremento cicli dopo ogni rotazione, vengono eseguite solo 1 volta per ciclo
 
 # scannerizza l'arena per un token che non sia presente dentro la lista dei token che 
 # sono già stati mossi e lo restituisce alla chiamante
 
-def go_to_token(token_code, ancorDistTol, cycle_count):
+def go_to_token(token_code, ancorDistTol):
     print("getting to token: ", token_code)
     (dist, ang) = get_token_info(token_code) # prendo le varibili del token per la prima votla
     while dist == -1 and ang == -1:
@@ -148,10 +226,14 @@ def go_to_token(token_code, ancorDistTol, cycle_count):
     if ancorDistTol == 0:       
         dist_tol = 0.5
     else:
-        dist_tol = ancorDistTol
+        token_avoidance = get_ancor_tol(token_code)
+        dist_tol = ancorDistTol * token_avoidance
+
+    print("tolleranza distanza:", dist_tol)
 
     angle_correction = -0.3 # per i primi 3 cicli non voglio aumentare la tolleranza
 
+    '''aggiungere controllo errore se dist e ang sono -1'''
     while(abs(ang) > ang_tol+angle_correction): # ----------------------------------------------------------------
         print("ang correction: ", ang)
         TSPEED, TTIME = turn_parameters(ang)
@@ -166,7 +248,6 @@ def go_to_token(token_code, ancorDistTol, cycle_count):
         drive(DSPEED, DTIME)
         (dist, ang) = get_token_info(token_code)
          
-
     try:
         grab_status = R.grab()
         while grab_status == False:
@@ -178,67 +259,7 @@ def go_to_token(token_code, ancorDistTol, cycle_count):
 # questa funzione mi permette di arrivare a qualsiasi token entro una tolleranza, se devo raggiungere 
 # l'ancora la tolleranza della distanza devo passarla come parametro ed è maggiore 
 
-def list_comparison(token_list, grabbed_token_list):
-    if len(token_list) != len(grabbed_token_list):
-        print("errore liste lunghezza diversa")
-        exit()
-    
-    controllo = 1
-    for i in range(len(token_list)):
-        if token_list[i] != grabbed_token_list[i]:
-            controllo = 0
 
-    return controllo
-
-
-def get_token_info(token_code):
-    dist = ang = -1
-    what_i_see = R.see()
-
-    for i in what_i_see:
-        if i.info.code == token_code:
-            dist = i.dist
-            ang = i.rot_y
-            break
-    
-    return dist, ang
-# passa le info posizione del token con codice token_code alla funzione chiamanta
-
-def turn_parameters(ang):
-    sign_moltip = -1
-    TSPEED = TTIME = 1
-
-    if ang > 0 :
-        if ang < 2:
-            TSPEED = 1
-            print("velocità trovata", TSPEED)
-        else:
-            TSPEED = ceil(abs((abs(ang)/3)-0.5))
-            print("velocità trovata", TSPEED)
-    else :
-        if ang > -2:
-            TSPEED = 1 * sign_moltip
-            print("velocità trovata", TSPEED)
-        else:
-            TSPEED = ceil(abs((abs(ang)/3)-0.5)) * sign_moltip
-            print("velocità trovata", TSPEED)
-
-
-        
-
-    return TSPEED, TTIME
-
-def drive_parameters(dist):
-    DSPEED = 1
-    DTIME = 0.7558
-
-    DSPEED = dist / 0.01
-    print("dspeed: ", DSPEED)
-    if dist < 1:
-        DTIME = DTIME / 2
-
-    return DSPEED, DTIME
-# passa i parametri per la velocità e tempo per i cicli di correzione per arrivare ai token
 
 #-----------------------------------------definizione main-----------------------------------------------#
 
@@ -264,11 +285,11 @@ def main():
     CONTROL = 0
     while CONTROL == 0:
         # trovo un codice di token che posso spostare
-        token_code, cycle_count = find_movable_token(grabbed_token_list) 
+        token_code = find_movable_token(grabbed_token_list) 
         
         # vado a prendere il token con codice token_code
-        go_to_token(token_code, 0, cycle_count) # tolleranza a zero --> seguo token non ancor
-        go_to_token(ancor, ancorTol, cycle_count) # tolleranza a ancorTol --> seguo ancor
+        go_to_token(token_code, 0) # tolleranza a zero --> seguo token non ancor
+        go_to_token(ancor, ancorTol) # tolleranza a ancorTol --> seguo ancor
         R.release()
 
         # aggiorno la lista dei token grabbati
