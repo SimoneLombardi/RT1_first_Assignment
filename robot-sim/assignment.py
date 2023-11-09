@@ -62,8 +62,14 @@ def find_token():
         return dist, rot_y
     
 #-----------------------------------------variabili globali mie------------------------------------------#
+MAXSPEED = 100
+MSTIME = 0.05
+
 SPEED = 80
 TIME = 0.25
+
+basespeed = 1
+basetime = 1
 #-----------------------------------------funzioni mie---------------------------------------------------#
 def list_comparison(token_list, grabbed_token_list):
     if len(token_list) != len(grabbed_token_list):
@@ -90,13 +96,14 @@ def get_token_info(token_code):
     
     return dist, ang
 # passa le info posizione del token con codice token_code alla funzione chiamanta
+    
 
 def get_ancor_tol(token_code):
     what_i_see = R.see()
 
     in_between_token = 0
 
-    ang_tol = 0.3
+    ang_tol = 3
     dist_tol = 1
 
     (dist, ang) = get_token_info(token_code)
@@ -118,26 +125,27 @@ def turn_parameters(ang):
     if ang > 0 :
         if ang < 2:
             TSPEED = 1
-            print("velocità trovata", TSPEED)
+            print("---> ang speed: ", TSPEED)
         else:
             TSPEED = ceil(abs((abs(ang)/3)-0.5))
-            print("velocità trovata", TSPEED)
+            print("---> ang speed: ", TSPEED)
     else :
         if ang > -2:
             TSPEED = 1 * sign_moltip
-            print("velocità trovata", TSPEED)
+            print("---> ang speed: ", TSPEED)
         else:
             TSPEED = ceil(abs((abs(ang)/3)-0.5)) * sign_moltip
-            print("velocità trovata", TSPEED)
+            print("---> ang speed: ", TSPEED)
 
     return TSPEED, TTIME
+
 
 def drive_parameters(dist):
     DSPEED = 1
     DTIME = 0.7558
 
     DSPEED = dist / 0.01
-    print("dspeed: ", DSPEED)
+    print("------> drive speed: ", round(DSPEED, 2))
     if dist < 1:
         DTIME = DTIME / 2
 
@@ -216,10 +224,8 @@ def find_movable_token(grabbed_token_list):
 
 def go_to_token(token_code, ancorDistTol):
     print("getting to token: ", token_code)
+
     (dist, ang) = get_token_info(token_code) # prendo le varibili del token per la prima votla
-    while dist == -1 and ang == -1:
-        turn(SPEED, TIME)
-        (dist, ang) = get_token_info(token_code)
 
     # definisco delle tolleranze per i cicli della rotazione e distanza
     ang_tol = 1
@@ -229,13 +235,12 @@ def go_to_token(token_code, ancorDistTol):
         token_avoidance = get_ancor_tol(token_code)
         dist_tol = ancorDistTol * token_avoidance
 
-    print("tolleranza distanza:", dist_tol)
+    print("TOLLERANCE:", dist_tol)
 
     angle_correction = -0.3 # per i primi 3 cicli non voglio aumentare la tolleranza
 
-    '''aggiungere controllo errore se dist e ang sono -1'''
     while(abs(ang) > ang_tol+angle_correction): # ----------------------------------------------------------------
-        print("ang correction: ", ang)
+        print("ang corr: ", round(ang, 3))
         TSPEED, TTIME = turn_parameters(ang)
         turn(TSPEED, TTIME)
         (dist, ang) = get_token_info(token_code)
@@ -243,18 +248,22 @@ def go_to_token(token_code, ancorDistTol):
 
         
     while(dist > dist_tol): # --------------------------------------------------------------------
-        print("dist correction: ", dist)
+        print("dist corr: ", round(dist, 3))
         DSPEED, DTIME = drive_parameters(dist)
         drive(DSPEED, DTIME)
         (dist, ang) = get_token_info(token_code)
-         
-    try:
-        grab_status = R.grab()
-        while grab_status == False:
-            drive(5, 1)
-            grab_status = R.grab()
-    except:
-        R.release()
+
+    grab_status = 0
+    while grab_status == 0:
+        temp = R.grab()
+        if temp == True:
+            grab_status = 1
+        elif temp == False:
+            drive(100, 0.01)
+        else:
+            R.release()
+            grab_status = 1
+
 
 # questa funzione mi permette di arrivare a qualsiasi token entro una tolleranza, se devo raggiungere 
 # l'ancora la tolleranza della distanza devo passarla come parametro ed è maggiore 
@@ -274,7 +283,7 @@ def main():
     grabbed_token_list = create_grabbed_token_list(ancor, grabbed_token_list, token_list) 
     print(grabbed_token_list)
 
-    ancorTol = 0.85
+    ancorTol = 1
 
     #---------------------------------------------------------------------------------------------#
     # inizializzazione del problema terminata, da adesso finchè token_list != grabbed_token_list continuo a:
@@ -289,8 +298,9 @@ def main():
         
         # vado a prendere il token con codice token_code
         go_to_token(token_code, 0) # tolleranza a zero --> seguo token non ancor
-        go_to_token(ancor, ancorTol) # tolleranza a ancorTol --> seguo ancor
-        R.release()
+        go_to_token(ancor, ancorTol) # tolleranza a ancorTol --> seguo ancora
+
+        drive(-5, 1)
 
         # aggiorno la lista dei token grabbati
         grabbed_token_list = create_grabbed_token_list(token_code, grabbed_token_list, token_list)
@@ -298,48 +308,12 @@ def main():
         # aggiorno la variabile control 
         CONTROL = list_comparison(token_list, grabbed_token_list)
         if CONTROL == 0:
-            print("continue putting token away...CONTROL = ", CONTROL)
+            print("KEEP GONIG...CONTROL = ", CONTROL)
         else:
-            print("no more token...CONTROL = ", CONTROL)
+            print(" NO MORE TOKEN...CONTROL = ", CONTROL)
 '''
-problematiche trovate nell'esecuzione :
-    0) modificare arrotondamento velocità superiore --> evitare problema blocco a speed 0
-    1) sensibilità dell'angolo soluzioni possibili
-        1.1) aumentare tolleranza con aumentare dei cicli
-        1.2) modificare tempo e velocità secondo una legge
-        1.3) modificare la tolleranza con informazioni sulla distanza -> variazione troppo sensibile a dist grandi
-
-    2) avvicinamento al token
-
-    3) ricerca del token ancora 
-        3.1) fare trace back delle rotazioni
-
-def create_token_list():
-    non serve modificarla
-    
-def set_ancor_token():
-    non serve modificarla
-
-def create_grabbed_token_list(token, grabbed_token_list, token_list): 
-    non serve modificarla
-
-def find_movable_token(grabbed_token_list):
-    deve poter ritornare il numero di rotazioni fatte per trovare il token successivo
-
-def go_to_token(token_code, ancorDistTol):
-    da modifcare con aggiunta go_to_ancor(ancor_code, rot_number) e togliere differenza su tolleranza
-
-def list_comparison(token_list, grabbed_token_list):
-    non serve modificare
-
-def get_token_info(token_code):
-    non serve modificare
-
-def turn_parameters(ang):
-    da modificare e vedere come
-
-def drive_parameters(dist):    
-
+modifica 1) 
+    aggiungo controllo su get token info per evitare che ritorni -100 -100 troppe volte
 
 '''
 
