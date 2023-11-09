@@ -151,25 +151,9 @@ def turn_parameters(ang):
     TSPEED = TTIME = 1 # inizializzo le variabili Turn SPEED e Turn TIME
 
     if ang > 0 : # controllo direzione maggiore di zero -> DX, minore di zero -> SX
-        '''
-        if ang < 2: # controllo per evitare il soft lock 
-            TSPEED = 1
-            print("---> ang speed: ", TSPEED)
-        else:
-            TSPEED = ceil(abs((abs(ang)/3)-0.5))
-            print("---> ang speed: ", TSPEED)
-        '''
         TSPEED = ceil(abs((abs(ang)/3)-0.5))
         print("---> ang speed: ", TSPEED)
     else :
-        '''
-        if ang > -2: # controllo per evitare il soft lock 
-            TSPEED = 1 * sign_moltip
-            print("---> ang speed: ", TSPEED)
-        else:
-            TSPEED = ceil(abs((abs(ang)/3)-0.5)) * sign_moltip
-            print("---> ang speed: ", TSPEED)
-        '''
         TSPEED = ceil(abs((abs(ang)/3)-0.5)) * sign_moltip
         print("---> ang speed: ", TSPEED)
 
