@@ -5,7 +5,7 @@
 ___
 
 ### Flow chart del programma
-
+![Blank diagram](https://github.com/SimoneLombardi/RT1_first_Assignment/assets/146358714/e693282b-d512-477f-900a-826318db664e)
 
 ___
 
